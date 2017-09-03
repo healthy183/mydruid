@@ -16,6 +16,7 @@
 	<!-- 使用CGLib动态代理 -->
 	<aop:aspectj-autoproxy proxy-target-class="true" />
 
+	<!--https://github.com/alibaba/druid/wiki/配置_DruidDataSource参考配置-->
 	<!-- 数据源配置 -->
 	<bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource">
 		<property name="url" value="${jdbc.url}" />
@@ -32,22 +33,23 @@
 		<!--申请连接是检测是否超过timeBetweenEvictionRunsMillis，是则通过validationQuery检测连接是否有效
 		建议设置true,保证连接安全性并不影响性能-->
 		<property name="testWhileIdle" value="true" />
-		<!--1,destory线程时检测连接间隔时间 2,testWhileIdle依据-->
+		<!--1,配置间隔多久才进行一次检测，检测需要关闭(jdbcUtils.close)的空闲连接 2,testWhileIdle依据-->
 		<property name="timeBetweenEvictionRunsMillis" value="6000" />
-		<!--连接在池中保持空闲而不被空闲连接回收器线程(如果有)回收的最小时间值，最少30000ms 单位毫秒-->
-		<!--<property name="minEvictableIdleTimeMillis" value="${jdbc.minEvictableIdleTimeMillis}" />-->
+		<!-- 配置一个连接在池中最小生存的时间，单位是毫秒 最少30000ms 单位毫秒-->
+		<property name="minEvictableIdleTimeMillis" value="30000" />
 		<!--验证连接是否有效的间隔-->
-		<property name="validationQuery" value="${jdbc.validationQuery}" />
+		<property name="validationQuery" value="SELECT 'x'" />
 		<!--申请连接时验证是否有效 默认true,耗性能,建议false因为通过testWhileIdle=ture和validationQuery实现此功能-->
 		<property name="testOnBorrow" value="false" />
 		<!--返回连接时验证是否有效 默认false-->
 		<property name="testOnReturn" value="false" />
-		<!--是否缓存PreparedStatements oracle建议打开  mysql则关闭-->
+		<!--是否缓存PreparedStatements oracle建议打开  mysql则关闭 分库分表较多的数据库，建议配置为false-->
 		<property name="poolPreparedStatements" value="false" />
 		<!--要启用PSCache，必须配置大于0，当大于0时，poolPreparedStatements自动触发修改为true。
 		在Druid中，不会存在Oracle下PSCache占用内存过多的问题，默认10-->
 		<property name="maxPoolPreparedStatementPerConnectionSize" value="0" />
 		<!-- 超过时间限制是否回收 不指定destroyScheduler就单线程跑,遇异常这些配置就无效了-->
+		<!--配置removeAbandoned对性能会有一些影响，建议怀疑存在泄漏之后再打开-->
 		<property name="removeAbandoned" value="true" />
 		<!-- 超时时间；单位为秒。180秒=3分钟 -->
 		<property name="removeAbandonedTimeout" value="180" />
@@ -58,6 +60,8 @@
 		<property name="proxyFilters">
 			<list>
 				<ref bean="stat-filter" />
+				<ref bean="log-filter" />
+
 			</list>
 		</property>
 		<!--打印slowsql另一种配置
@@ -87,6 +91,11 @@
 		<property name="logSlowSql" value="true" />
 		<!--sql合并支持tddl，能够对分表进行合并-->
 		<property name="mergeSql" value="true" />
+	</bean>
+
+	<bean id="log-filter" class="com.alibaba.druid.filter.logging.Slf4jLogFilter">
+		<!--showsql，debug级别-->
+		<property name="statementExecutableSqlLogEnable" value="false" />
 	</bean>
 
 	<!-- 会话工厂 -->
