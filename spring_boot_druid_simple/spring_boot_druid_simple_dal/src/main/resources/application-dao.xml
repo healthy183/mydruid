@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:p="http://www.springframework.org/schema/p" xmlns:tx="http://www.springframework.org/schema/tx"
+	xmlns:context="http://www.springframework.org/schema/context" xmlns:aop="http://www.springframework.org/schema/aop"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.3.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.3.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.3.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.3.xsd">
+
+	<!-- 配置文件加载 -->
+	<context:property-placeholder ignore-resource-not-found="false"
+		location="classpath*:/properties/resouce-config.properties" />
+	<!-- 扫描注解 -->
+	<context:component-scan base-package="com.kang.boot.dal" />
+	<context:annotation-config/>
+	<!-- 使用CGLib动态代理 -->
+	<aop:aspectj-autoproxy proxy-target-class="true" />
+
+	<!-- 数据源配置 -->
+	<bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource">
+		<property name="url" value="${jdbc.url}" />
+		<property name="username" value="${jdbc.user}" />
+		<property name="password" value="${jdbc.password}" />
+		<!--初始连接数-->
+		<property name="initialSize" value="1" />
+		<!-- 最少连接数-->
+		<property name="minIdle" value="1" />
+		<!--最大连接数-->
+		<property name="maxActive" value="100" />
+		<!-- 配置获取连接等待超时的时间 -->
+		<property name="maxWait" value="60000" />
+		<!--申请连接是检测是否超过timeBetweenEvictionRunsMillis，是则通过validationQuery检测连接是否有效
+		建议设置true,保证连接安全性并不影响性能-->
+		<property name="testWhileIdle" value="true" />
+		<!--1,destory线程时检测连接间隔时间 2,testWhileIdle依据-->
+		<property name="timeBetweenEvictionRunsMillis" value="6000" />
+		<!--连接在池中保持空闲而不被空闲连接回收器线程(如果有)回收的最小时间值，最少30000ms 单位毫秒-->
+		<!--<property name="minEvictableIdleTimeMillis" value="${jdbc.minEvictableIdleTimeMillis}" />-->
+		<!--验证连接是否有效的间隔-->
+		<property name="validationQuery" value="${jdbc.validationQuery}" />
+		<!--申请连接时验证是否有效 默认true,耗性能,建议false因为通过testWhileIdle=ture和validationQuery实现此功能-->
+		<property name="testOnBorrow" value="false" />
+		<!--返回连接时验证是否有效 默认false-->
+		<property name="testOnReturn" value="false" />
+		<!--是否缓存PreparedStatements oracle建议打开  mysql则关闭-->
+		<property name="poolPreparedStatements" value="false" />
+		<!--要启用PSCache，必须配置大于0，当大于0时，poolPreparedStatements自动触发修改为true。
+		在Druid中，不会存在Oracle下PSCache占用内存过多的问题，默认10-->
+		<property name="maxPoolPreparedStatementPerConnectionSize" value="0" />
+		<!-- 超过时间限制是否回收 不指定destroyScheduler就单线程跑,遇异常这些配置就无效了-->
+		<property name="removeAbandoned" value="true" />
+		<!-- 超时时间；单位为秒。180秒=3分钟 -->
+		<property name="removeAbandonedTimeout" value="180" />
+		<!-- 关闭abanded连接时输出错误日志  耗性能-->
+		<property name="logAbandoned" value="true" />
+		<!--过滤器  stat(监控统计) slf4j(使用slf4j统计)-->
+		<property name="filters" value="slf4j" />
+		<property name="proxyFilters">
+			<list>
+				<ref bean="stat-filter" />
+			</list>
+		</property>
+		<!--打印slowsql另一种配置
+		druid.stat.logSlowSql=true，mergeSql=true
+		<property name="connectionProperties" value="druid.stat.logSlowSql=true,druid.stat.mergeSql=true" />-->
+
+		<!--打印监控sql的间隔-->
+		<property name="timeBetweenLogStatsMillis" value="1"></property>
+		<property name="statLogger" ref="statLoggerb"></property>
+	</bean>
+
+
+	<bean id= "statLoggerb" class="com.alibaba.druid.pool.DruidDataSourceStatLoggerImpl" >
+		<property name= "logger" ref ="slf4jb" />
+	</bean>
+
+	<bean id="slf4jb" class="com.alibaba.druid.support.logging.SLF4JImpl" >
+			<constructor-arg>
+				<value>druid.statlog</value>
+			</constructor-arg>
+	</bean >
+
+
+	<bean id="stat-filter" class="com.alibaba.druid.filter.stat.StatFilter">
+		<!--执行时间超过5毫秒则打印-->
+		<property name="slowSqlMillis" value="5" />
+		<property name="logSlowSql" value="true" />
+		<!--sql合并支持tddl，能够对分表进行合并-->
+		<property name="mergeSql" value="true" />
+	</bean>
+
+	<!-- 会话工厂 -->
+	<bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<property name="dataSource" ref="dataSource" />
+ 		<property name="configLocation" value="classpath:mybatis-config.xml" />
+		<property name="mapperLocations" value="classpath*:/mybatis/*Mapper.xml" />
+		<property name="typeAliasesPackage" value="com.kang.boot.dal.model" />
+	</bean>
+
+	<!-- 映射扫描 -->
+	<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+		<property name="sqlSessionFactoryBeanName" value="sqlSessionFactory"/>
+		<property name="basePackage" value="com.kang.boot.dal.mapper" />
+	</bean>
+
+	<!-- 定义事务管理器 -->
+	<bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource" />
+	</bean>
+	
+	<!-- 支持事务注解 -->
+	<tx:annotation-driven transaction-manager="transactionManager" />
+
+</beans>
